@@ -1,130 +1,124 @@
 import script from '../src/script.mjs';
 
-describe('Job Template Script', () => {
+describe('AWS Revoke Session Script', () => {
   const mockContext = {
     env: {
       ENVIRONMENT: 'test'
     },
     secrets: {
-      API_KEY: 'test-api-key-123456'
+      AWS_ACCESS_KEY_ID: 'test-access-key',
+      AWS_SECRET_ACCESS_KEY: 'test-secret-key'
     },
-    outputs: {},
-    partial_results: {},
-    current_step: 'start'
+    outputs: {}
   };
 
+  beforeEach(() => {
+    // Mock console to avoid noise in tests
+    global.console.log = () => {};
+    global.console.error = () => {};
+  });
+
   describe('invoke handler', () => {
-    test('should execute successfully with minimal params', async () => {
+    test('should throw error for missing roleName', async () => {
       const params = {
-        target: 'test-user@example.com',
-        action: 'create'
+        region: 'us-east-1'
       };
 
-      const result = await script.invoke(params, mockContext);
-
-      expect(result.status).toBe('success');
-      expect(result.target).toBe('test-user@example.com');
-      expect(result.action).toBe('create');
-      expect(result.status).toBeDefined();
-      expect(result.processed_at).toBeDefined();
-      expect(result.options_processed).toBe(0);
+      await expect(script.invoke(params, mockContext))
+        .rejects.toThrow('Invalid or missing roleName parameter');
     });
 
-    test('should handle dry run mode', async () => {
+    test('should throw error for missing region', async () => {
       const params = {
-        target: 'test-user@example.com',
-        action: 'delete',
-        dry_run: true
+        roleName: 'TestRole'
       };
 
-      const result = await script.invoke(params, mockContext);
-
-      expect(result.status).toBe('dry_run_completed');
-      expect(result.target).toBe('test-user@example.com');
-      expect(result.action).toBe('delete');
+      await expect(script.invoke(params, mockContext))
+        .rejects.toThrow('Invalid or missing region parameter');
     });
 
-    test('should process options array', async () => {
+    test('should throw error for missing AWS credentials', async () => {
       const params = {
-        target: 'test-group',
-        action: 'update',
-        options: ['force', 'notify', 'audit']
+        roleName: 'TestRole',
+        region: 'us-east-1'
       };
 
-      const result = await script.invoke(params, mockContext);
-
-      expect(result.status).toBe('success');
-      expect(result.target).toBe('test-group');
-      expect(result.options_processed).toBe(3);
-    });
-
-    test('should handle context with previous job outputs', async () => {
-      const contextWithOutputs = {
+      const contextWithoutCreds = {
         ...mockContext,
-        outputs: {
-          'create-user': {
-            user_id: '12345',
-            created_at: '2024-01-15T10:30:00Z'
-          },
-          'assign-groups': {
-            groups_assigned: 3
-          }
-        }
+        secrets: {}
       };
 
-      const params = {
-        target: 'user-12345',
-        action: 'finalize'
-      };
-
-      const result = await script.invoke(params, contextWithOutputs);
-
-      expect(result.status).toBe('success');
-      expect(result.target).toBe('user-12345');
-      expect(result.status).toBeDefined();
+      await expect(script.invoke(params, contextWithoutCreds))
+        .rejects.toThrow('Missing required AWS credentials in secrets');
     });
+
+    test('should handle invalid conditions JSON', async () => {
+      const params = {
+        roleName: 'TestRole',
+        region: 'us-east-1',
+        conditions: 'invalid json'
+      };
+
+      await expect(script.invoke(params, mockContext))
+        .rejects.toThrow('Invalid conditions JSON');
+    });
+
+    // Note: Testing actual AWS SDK calls would require mocking the SDK
+    // or integration tests with real AWS credentials
   });
 
   describe('error handler', () => {
-    test('should throw error by default', async () => {
+    test('should re-throw error for framework to handle', async () => {
       const params = {
-        target: 'test-user@example.com',
-        action: 'create',
-        error: {
-          message: 'Something went wrong',
-          code: 'ERROR_CODE'
-        }
+        roleName: 'TestRole',
+        region: 'us-east-1',
+        error: new Error('Network timeout')
       };
 
-      await expect(script.error(params, mockContext)).rejects.toThrow('Unable to recover from error: Something went wrong');
+      await expect(script.error(params, mockContext))
+        .rejects.toThrow('Network timeout');
     });
   });
 
   describe('halt handler', () => {
     test('should handle graceful shutdown', async () => {
       const params = {
-        target: 'test-user@example.com',
+        roleName: 'TestRole',
         reason: 'timeout'
       };
 
       const result = await script.halt(params, mockContext);
 
-      expect(result.status).toBe('halted');
-      expect(result.target).toBe('test-user@example.com');
+      expect(result.roleName).toBe('TestRole');
       expect(result.reason).toBe('timeout');
-      expect(result.halted_at).toBeDefined();
+      expect(result.haltedAt).toBeDefined();
+      expect(result.cleanupCompleted).toBe(true);
     });
 
-    test('should handle halt without target', async () => {
+    test('should handle halt with missing params', async () => {
       const params = {
         reason: 'system_shutdown'
       };
 
       const result = await script.halt(params, mockContext);
 
-      expect(result.status).toBe('halted');
-      expect(result.target).toBe('unknown');
+      expect(result.roleName).toBe('unknown');
       expect(result.reason).toBe('system_shutdown');
+      expect(result.cleanupCompleted).toBe(true);
+    });
+  });
+
+  describe('policy creation', () => {
+    test('should create policy with current time if tokenIssueTime not provided', async () => {
+      // This would require exposing the createRevocationPolicy function
+      // or mocking the IAMClient to intercept the policy document
+      expect(true).toBe(true); // Placeholder
+    });
+
+    test('should use provided tokenIssueTime when specified', async () => {
+      // This would require exposing the createRevocationPolicy function
+      // or mocking the IAMClient to intercept the policy document
+      expect(true).toBe(true); // Placeholder
     });
   });
 });

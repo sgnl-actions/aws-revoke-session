@@ -1,48 +1,63 @@
-name: job-template
-description: Template for SGNL JavaScript jobs - replace with your job description
+name: aws-revoke-session
+description: Revoke AWS sessions by applying a deny policy for tokens issued before a specific time
 
 # Input parameters for web form generation
 inputs:
-  target:
+  roleName:
     type: text
-    description: Target resource identifier (e.g., user email, group ID)
+    description: The name of the IAM role to apply the session revocation policy to
     required: true
     validation:
       min: 1
-      max: 100
+      max: 64
 
-  action:
+  region:
     type: text
-    description: Action to perform on the target resource
+    description: AWS region (e.g., us-east-1)
     required: true
     validation:
       min: 1
-      max: 50
+      max: 30
 
-  options:
-    type: array
-    description: Additional options for the operation
+  conditions:
+    type: json
+    description: Optional additional conditions to append to the revocation policy (JSON format)
     required: false
-    item_type: text
-    validation:
-      max: 10
 
-  dry_run:
-    type: boolean
-    description: Preview changes without executing them
+  tokenIssueTime:
+    type: datetime
+    description: Optional token issue time to revoke sessions before (defaults to current time)
     required: false
-    default: false
 
 # Expected output structure
 outputs:
-  status:
+  roleName:
     type: text
-    description: Operation result (success, failed, recovered, etc.)
+    description: The role name that was updated
 
-  target:
+  policyName:
     type: text
-    description: The target resource that was processed
+    description: The name of the policy that was applied
 
-  processed_at:
+  tokenIssueTime:
     type: datetime
-    description: When the operation completed (ISO 8601)
+    description: The token issue time used for revocation
+
+  applied:
+    type: boolean
+    description: Whether the policy was successfully applied
+
+  appliedAt:
+    type: datetime
+    description: When the policy was applied (ISO 8601)
+
+# Required secrets (configured at deployment time)
+secrets:
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+
+# Runtime configuration
+runtime:
+  type: nodejs-22
+  timeout: 30s
+  memory: 128Mi
