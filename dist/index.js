@@ -8916,10 +8916,10 @@ function createRevocationPolicy(tokenIssueTime, additionalConditions) {
   // Merge additional conditions if provided
   if (additionalConditions) {
     try {
-      const conditions = typeof additionalConditions === 'string' 
-        ? JSON.parse(additionalConditions) 
+      const conditions = typeof additionalConditions === 'string'
+        ? JSON.parse(additionalConditions)
         : additionalConditions;
-      
+
       Object.entries(conditions).forEach(([operator, context]) => {
         policy.Statement[0].Condition[operator] = {
           ...policy.Statement[0].Condition[operator],
@@ -8965,7 +8965,7 @@ function validateInputs(params) {
   if (!params.roleName || typeof params.roleName !== 'string' || params.roleName.trim() === '') {
     throw new FatalError('Invalid or missing roleName parameter');
   }
-  
+
   if (!params.region || typeof params.region !== 'string' || params.region.trim() === '') {
     throw new FatalError('Invalid or missing region parameter');
   }
@@ -8974,38 +8974,38 @@ function validateInputs(params) {
 var script = {
   invoke: async (params, context) => {
     console.log('Starting AWS Revoke Session action');
-    
+
     try {
       validateInputs(params);
-      
+
       const { roleName, region, conditions, tokenIssueTime } = params;
-      
+
       console.log(`Processing role: ${roleName} in region: ${region}`);
-      
-      if (!context.secrets?.AWS_ACCESS_KEY_ID || !context.secrets?.AWS_SECRET_ACCESS_KEY) {
-        throw new FatalError('Missing required AWS credentials in secrets');
+
+      if (!context.secrets?.BASIC_USERNAME || !context.secrets?.BASIC_PASSWORD) {
+        throw new FatalError('Missing required credentials in secrets');
       }
-      
+
       // Create AWS IAM client
       const client = new IAMClient({
         region: region,
         credentials: {
-          accessKeyId: context.secrets.AWS_ACCESS_KEY_ID,
-          secretAccessKey: context.secrets.AWS_SECRET_ACCESS_KEY
+          accessKeyId: context.secrets.BASIC_USERNAME,
+          secretAccessKey: context.secrets.BASIC_PASSWORD
         }
       });
-      
+
       // Use provided tokenIssueTime or current time
       const revokeBeforeTime = tokenIssueTime ? new Date(tokenIssueTime) : new Date();
-      
+
       console.log(`Revoking sessions with tokens issued before: ${revokeBeforeTime.toISOString()}`);
-      
+
       // Create the revocation policy
       const policyDocument = createRevocationPolicy(revokeBeforeTime, conditions);
-      
+
       // Apply the policy to the role
       await applyRevocationPolicy(client, roleName, policyDocument);
-      
+
       const result = {
         roleName,
         policyName: POLICY_NAME,
@@ -9013,17 +9013,17 @@ var script = {
         applied: true,
         appliedAt: new Date().toISOString()
       };
-      
+
       console.log('Session revocation policy applied successfully');
       return result;
-      
+
     } catch (error) {
       console.error(`Error applying revocation policy: ${error.message}`);
-      
+
       if (error instanceof RetryableError || error instanceof FatalError) {
         throw error;
       }
-      
+
       throw new FatalError(`Unexpected error: ${error.message}`);
     }
   },
@@ -9031,7 +9031,7 @@ var script = {
   error: async (params, _context) => {
     const { error } = params;
     console.error(`Error handler invoked: ${error?.message}`);
-    
+
     // Re-throw to let framework handle retries
     throw error;
   },
@@ -9039,7 +9039,7 @@ var script = {
   halt: async (params, _context) => {
     const { reason, roleName } = params;
     console.log(`Job is being halted (${reason})`);
-    
+
     return {
       roleName: roleName || 'unknown',
       reason: reason || 'unknown',
