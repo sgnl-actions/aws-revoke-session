@@ -8972,6 +8972,18 @@ function validateInputs(params) {
 }
 
 var script = {
+  /**
+   * Main execution handler - revokes AWS IAM role sessions
+   * @param {Object} params - Job input parameters
+   * @param {string} params.roleName - IAM role name
+   * @param {string} params.region - AWS region
+   * @param {Object} params.conditions - Additional policy conditions (optional)
+   * @param {string} params.tokenIssueTime - Token issue time for revocation cutoff (optional, defaults to current time)
+   * @param {Object} context - Execution context with env, secrets, outputs
+   * @param {string} context.secrets.BASIC_USERNAME - AWS Access Key ID
+   * @param {string} context.secrets.BASIC_PASSWORD - AWS Secret Access Key
+   * @returns {Object} Revocation results
+   */
   invoke: async (params, context) => {
     console.log('Starting AWS Revoke Session action');
 
@@ -9028,6 +9040,12 @@ var script = {
     }
   },
 
+  /**
+   * Error recovery handler - handles retryable errors
+   * @param {Object} params - Original params plus error information
+   * @param {Object} context - Execution context
+   * @returns {Object} Recovery results
+   */
   error: async (params, _context) => {
     const { error } = params;
     console.error(`Error handler invoked: ${error?.message}`);
@@ -9036,6 +9054,12 @@ var script = {
     throw error;
   },
 
+  /**
+   * Graceful shutdown handler - performs cleanup
+   * @param {Object} params - Original params plus halt reason
+   * @param {Object} context - Execution context
+   * @returns {Object} Cleanup results
+   */
   halt: async (params, _context) => {
     const { reason, roleName } = params;
     console.log(`Job is being halted (${reason})`);
