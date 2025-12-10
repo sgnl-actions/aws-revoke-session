@@ -1,4 +1,5 @@
 import { IAMClient, PutRolePolicyCommand } from '@aws-sdk/client-iam';
+import { resolveJSONPathTemplates} from '@sgnl-actions/utils';
 
 class RetryableError extends Error {
   constructor(message) {
@@ -106,10 +107,18 @@ export default {
   invoke: async (params, context) => {
     console.log('Starting AWS Revoke Session action');
 
-    try {
-      validateInputs(params);
+    const jobContext = context.data || {};
 
-      const { roleName, region, conditions, tokenIssueTime } = params;
+    // Resolve JSONPath templates in params
+    const { result: resolvedParams, errors } = resolveJSONPathTemplates(params, jobContext);
+    if (errors.length > 0) {
+      throw new Error(`Failed to resolve template values: ${errors.join(', ')}`);
+    }
+
+    try {
+      validateInputs(resolvedParams);
+
+      const { roleName, region, conditions, tokenIssueTime } = resolvedParams;
 
       console.log(`Processing role: ${roleName} in region: ${region}`);
 
