@@ -27,7 +27,7 @@
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-iam": "^3.864.0",
-    "@sgnl-actions/utils": "github:sgnl-actions/utils#v1.0.3"
+    "@sgnl-actions/utils": "github:sgnl-actions/utils#v1.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
