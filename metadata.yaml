@@ -20,7 +20,7 @@ inputs:
       max: 30
 
   conditions:
-    type: json
+    type: text
     description: Optional additional conditions to append to the revocation policy (JSON format)
     required: false
 
