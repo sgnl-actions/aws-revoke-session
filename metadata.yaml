@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/sgnl-actions/schemas/main/metadata.schema.json
 name: aws-revoke-session
 description: Revoke AWS sessions by applying a deny policy for tokens issued before a specific time
 
