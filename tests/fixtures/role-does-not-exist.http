@@ -1,0 +1,16 @@
+HTTP/1.1 404 Not Found
+connection: close
+content-length: 291
+content-type: text/xml
+date: Mon, 02 Mar 2026 22:25:27 GMT
+x-amzn-requestid: 5034e072-3077-4c13-ab1a-919c8b3802b2
+
+<ErrorResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <Error>
+    <Type>Sender</Type>
+    <Code>NoSuchEntity</Code>
+    <Message>The role with name test-role-2 cannot be found.</Message>
+  </Error>
+  <RequestId>5034e072-3077-4c13-ab1a-919c8b3802b2</RequestId>
+</ErrorResponse>
+
