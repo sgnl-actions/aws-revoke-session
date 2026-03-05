@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+connection: close
+content-length: 206
+content-type: text/xml
+date: Mon, 02 Mar 2026 22:23:09 GMT
+x-amzn-requestid: e57cb930-df00-448c-b522-1c5491c83739
+
+<PutRolePolicyResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <ResponseMetadata>
+    <RequestId>e57cb930-df00-448c-b522-1c5491c83739</RequestId>
+  </ResponseMetadata>
+</PutRolePolicyResponse>
+
