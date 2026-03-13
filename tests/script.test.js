@@ -1,4 +1,15 @@
 import script from '../src/script.mjs';
+import { runScenarios } from '@sgnl-actions/testing';
+
+// Disable AWS SDK retries — nock's socket-level behavior can trigger
+// spurious retries that exhaust the single-use interceptors.
+process.env.AWS_MAX_ATTEMPTS = '1';
+
+runScenarios({
+  script: './src/script.mjs',
+  scenarios: './tests/scenarios.yaml',
+  includeCommon: false
+});
 
 describe('AWS Revoke Session Script', () => {
   const mockContext = {
@@ -18,54 +29,8 @@ describe('AWS Revoke Session Script', () => {
     global.console.error = () => {};
   });
 
-  describe('invoke handler', () => {
-    test('should throw error for missing roleName', async () => {
-      const params = {
-        region: 'us-east-1'
-      };
-
-      await expect(script.invoke(params, mockContext))
-        .rejects.toThrow('Invalid or missing roleName parameter');
-    });
-
-    test('should throw error for missing region', async () => {
-      const params = {
-        roleName: 'TestRole'
-      };
-
-      await expect(script.invoke(params, mockContext))
-        .rejects.toThrow('Invalid or missing region parameter');
-    });
-
-    test('should throw error for missing AWS credentials', async () => {
-      const params = {
-        roleName: 'TestRole',
-        region: 'us-east-1'
-      };
-
-      const contextWithoutCreds = {
-        ...mockContext,
-        secrets: {}
-      };
-
-      await expect(script.invoke(params, contextWithoutCreds))
-        .rejects.toThrow('Missing required credentials in secrets');
-    });
-
-    test('should handle invalid conditions JSON', async () => {
-      const params = {
-        roleName: 'TestRole',
-        region: 'us-east-1',
-        conditions: 'invalid json'
-      };
-
-      await expect(script.invoke(params, mockContext))
-        .rejects.toThrow('Invalid conditions JSON');
-    });
-
-    // Note: Testing actual AWS SDK calls would require mocking the SDK
-    // or integration tests with real AWS credentials
-  });
+  // Note: Input validation and authentication tests are covered in scenarios.yaml
+  // These unit tests focus on handler-specific logic not covered by integration tests
 
   describe('error handler', () => {
     test('should re-throw error for framework to handle', async () => {
@@ -105,20 +70,6 @@ describe('AWS Revoke Session Script', () => {
       expect(result.roleName).toBe('unknown');
       expect(result.reason).toBe('system_shutdown');
       expect(result.cleanupCompleted).toBe(true);
-    });
-  });
-
-  describe('policy creation', () => {
-    test('should create policy with current time if tokenIssueTime not provided', async () => {
-      // This would require exposing the createRevocationPolicy function
-      // or mocking the IAMClient to intercept the policy document
-      expect(true).toBe(true); // Placeholder
-    });
-
-    test('should use provided tokenIssueTime when specified', async () => {
-      // This would require exposing the createRevocationPolicy function
-      // or mocking the IAMClient to intercept the policy document
-      expect(true).toBe(true); // Placeholder
     });
   });
 });
