@@ -1,4 +1,6 @@
 import { IAMClient, PutRolePolicyCommand } from '@aws-sdk/client-iam';
+import { getAwsCredentials } from './auth.mjs';
+import { randomUUID } from 'node:crypto';
 
 class RetryableError extends Error {
   constructor(message) {
@@ -73,7 +75,7 @@ async function applyRevocationPolicy(client, roleName, policyDocument) {
     if (error.name === 'UnauthorizedException' || error.name === 'AccessDeniedException') {
       throw new FatalError(`Access denied: ${error.message}`);
     }
-    if (error.name === 'ThrottlingException' || error.name === 'ServiceUnavailableException') {
+    if (error.name === 'ThrottlingException' || error.name === 'ServiceUnavailableException' || error.name === 'Throttling') {
       throw new RetryableError(`AWS service temporarily unavailable: ${error.message}`);
     }
     throw new FatalError(`Failed to apply policy: ${error.message}`);
@@ -90,6 +92,61 @@ function validateInputs(params) {
   }
 }
 
+function hasBasicAuth(context) {
+  return Boolean(context.secrets?.BASIC_USERNAME && context.secrets?.BASIC_PASSWORD);
+}
+
+function hasOAuth2ClientCredentials(context) {
+  return Boolean(
+    context.environment?.OAUTH2_CLIENT_CREDENTIALS_CLIENT_ID &&
+      context.environment?.OAUTH2_CLIENT_CREDENTIALS_TOKEN_URL &&
+      context.secrets?.OAUTH2_CLIENT_CREDENTIALS_CLIENT_SECRET
+  );
+}
+
+function hasAwsAssumeRoleWebIdentityConfig(context) {
+  return Boolean(
+    context.environment?.AWS_ASSUME_ROLE_WEB_IDENTITY_REGION &&
+    context.environment?.AWS_ASSUME_ROLE_WEB_IDENTITY_ROLE_ARN
+  );
+}
+
+function buildAwsCredentialsParams(context) {
+  if (hasBasicAuth(context)) {
+    return {
+      basic: {
+        username:  context.secrets.BASIC_USERNAME,
+        password: context.secrets.BASIC_PASSWORD
+      }
+    };
+  }
+
+  if (hasOAuth2ClientCredentials(context)) {
+    if (!hasAwsAssumeRoleWebIdentityConfig(context)) {
+      throw new FatalError('OAuth2ClientCredentials missing required AwsAssumeRoleWebIdentity configuration');
+    }
+
+    return {
+      clientCredentials: {
+        clientId: context.environment.OAUTH2_CLIENT_CREDENTIALS_CLIENT_ID,
+        clientSecret: context.secrets.OAUTH2_CLIENT_CREDENTIALS_CLIENT_SECRET,
+        tokenUrl: context.environment.OAUTH2_CLIENT_CREDENTIALS_TOKEN_URL,
+        scope: context.environment.OAUTH2_CLIENT_CREDENTIALS_SCOPE,
+        audience: context.environment.OAUTH2_CLIENT_CREDENTIALS_AUDIENCE,
+        authStyle: context.environment.OAUTH2_CLIENT_CREDENTIALS_AUTH_STYLE,
+        awsConfig: {
+          region: context.environment.AWS_ASSUME_ROLE_WEB_IDENTITY_REGION,
+          roleArn: context.environment.AWS_ASSUME_ROLE_WEB_IDENTITY_ROLE_ARN,
+          sessionName: context.environment.AWS_ASSUME_ROLE_WEB_IDENTITY_SESSION_NAME || `sgnl-action-${randomUUID()}`,
+          sessionDuration: context.environment.AWS_ASSUME_ROLE_WEB_IDENTITY_SESSION_DURATION_SECONDS
+        }
+      }
+    };
+  }
+
+  throw new FatalError('unsupported auth type: expected Basic or OAuth2ClientCredentials with AwsAssumeRoleWebIdentity');
+}
+
 export default {
   /**
    * Main execution handler - revokes AWS IAM role sessions
@@ -99,8 +156,8 @@ export default {
    * @param {Object} params.conditions - Additional policy conditions (optional)
    * @param {string} params.tokenIssueTime - Token issue time for revocation cutoff (optional, defaults to current time)
    * @param {Object} context - Execution context with env, secrets, outputs
-   * @param {string} context.secrets.BASIC_USERNAME - AWS Access Key ID
-   * @param {string} context.secrets.BASIC_PASSWORD - AWS Secret Access Key
+   * @param {string} context.secrets.BASIC_USERNAME - AWS Access Key ID (if using Basic auth)
+   * @param {string} context.secrets.BASIC_PASSWORD - AWS Secret Access Key (if using Basic auth)
    * @returns {Object} Revocation results
    */
   invoke: async (params, context) => {
@@ -113,17 +170,12 @@ export default {
 
       console.log(`Processing role: ${roleName} in region: ${region}`);
 
-      if (!context.secrets?.BASIC_USERNAME || !context.secrets?.BASIC_PASSWORD) {
-        throw new FatalError('Missing required credentials in secrets');
-      }
+      const awsCredentialsParams = buildAwsCredentialsParams(context);
 
       // Create AWS IAM client
       const client = new IAMClient({
         region: region,
-        credentials: {
-          accessKeyId: context.secrets.BASIC_USERNAME,
-          secretAccessKey: context.secrets.BASIC_PASSWORD
-        }
+        credentials: await getAwsCredentials(awsCredentialsParams)
       });
 
       // Use provided tokenIssueTime or current time
@@ -137,16 +189,14 @@ export default {
       // Apply the policy to the role
       await applyRevocationPolicy(client, roleName, policyDocument);
 
-      const result = {
+      console.log('Session revocation policy applied successfully');
+      return {
         roleName,
         policyName: POLICY_NAME,
         tokenIssueTime: revokeBeforeTime.toISOString(),
         applied: true,
         appliedAt: new Date().toISOString()
       };
-
-      console.log('Session revocation policy applied successfully');
-      return result;
 
     } catch (error) {
       console.error(`Error applying revocation policy: ${error.message}`);
