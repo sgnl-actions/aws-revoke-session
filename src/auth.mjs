@@ -32,7 +32,7 @@ async function getWebIdentityCredentialsProvider(clientCredentials) {
 
   const webIdentityToken = await getClientCredentialsToken({ tokenUrl, clientId, clientSecret, scope, audience, authStyle });
 
-  const stsClient = new STSClient({ 
+  const stsClient = new STSClient({
     region,
     credentials: { accessKeyId: '', secretAccessKey: '' }
   });
