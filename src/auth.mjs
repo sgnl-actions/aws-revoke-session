@@ -32,7 +32,10 @@ async function getWebIdentityCredentialsProvider(clientCredentials) {
 
   const webIdentityToken = await getClientCredentialsToken({ tokenUrl, clientId, clientSecret, scope, audience, authStyle });
 
-  const stsClient = new STSClient({ region });
+  const stsClient = new STSClient({ 
+    region,
+    credentials: { accessKeyId: '', secretAccessKey: '' }
+  });
 
   const resp = await stsClient.send(new AssumeRoleWithWebIdentityCommand({
     RoleArn: roleArn,
