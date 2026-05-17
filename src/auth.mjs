@@ -32,7 +32,10 @@ async function getWebIdentityCredentialsProvider(clientCredentials) {
 
   const webIdentityToken = await getClientCredentialsToken({ tokenUrl, clientId, clientSecret, scope, audience, authStyle });
 
-  const stsClient = new STSClient({ region });
+  const stsClient = new STSClient({
+    region,
+    credentials: async () => ({ accessKeyId: '', secretAccessKey: '' }) // STS client requires credentials to make the AssumeRoleWithWebIdentity call, but they are not used since we are passing the web identity token, so we can provide dummy credentials here
+  });
 
   const resp = await stsClient.send(new AssumeRoleWithWebIdentityCommand({
     RoleArn: roleArn,
